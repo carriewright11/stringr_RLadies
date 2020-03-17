@@ -404,13 +404,25 @@ Since we originally split based on 2 or more spaces, we can just add a space in 
 table%>%
 str_which(pattern = "seafood|sugar")
 ```
-
-Now we can replace these values within the table object:
+Here we can see just those strings that match the pattern:
 ```{r}
-table[9] <-stringr::str_replace(pattern = "Mean", 
-                                replacement = " Mean", table[9])
-table[12] <-stringr::str_replace(pattern ="Mean", 
-                                 replacement =" Mean", table[12])
+table[str_which(table, pattern = "seafood|sugar")]
+```
+
+Now we can replace these values within the table object after adding a space in front of "Mean".
+```{r}
+table[str_which(table, 
+      pattern = 
+      "seafood|sugar")]<-str_replace(
+                            string = table[str_which(table, 
+                              pattern = 
+                              "seafood|sugar")], 
+                            pattern = "Mean", 
+                            replacement = " Mean")
+```
+
+And now we can try splitting again by 2 or more spaces:
+```{r}
 table_split <- str_split(table,pattern= "\\s{2,}")
 ```
 
@@ -675,9 +687,9 @@ If we had not replaced the `"·"` interpunct values to a period conversion from 
 
 We seem to have lost the word `"beverages"` from the `"sugar-sweetened beverages"` category,  as well as `"fatty acids"` from the `"seafood omega 3 fatty acids"`, and the `"polyunsaturated fatty acids"` categories as the full category name was listed on two lines within the table. We would like to replace these values with the full name. 
 
-To select the `food` column we will show you several options. Only a couple will work well with reassigning the data in that particular variable within `guidelines` without assigning an intermediate data object. We will look using `mutate_at()`, `pull()`, `select()`, and brackets `[,c("variable name")]`.
+To select the `food` column we will show you several options. Only a couple will work well with reassigning the data in that particular variable within `guidelines` without assigning an intermediate data object. We will look using `mutate_at()`, `pull()`, `select()`, and two styles of brackets `[,c("variable name")]` and `[["variablename"]]`.
 
-The bracket option and the select() option will grab a tibble (data frame) version of the food column out of guidelines. However we can't start commands with select for assignments.
+The bracket `[,c("variable name")]` option and the select() option will grab a tibble (data frame) version of the food column out of guidelines. However we can't start commands with select for assignments.
 
 ```{r}
 guidelines[,c("food")] #same output as select
@@ -685,10 +697,11 @@ select(guidelines, "food") # same output as brackets
 ```
 
 
-`pull()` in contrast, will grab the vector version of the food data:
+`pull()` and the bracket `[["variable name"]]` option in contrast, will grab the vector version of the food data:
 
 ```{r}
 pull(guidelines, "food") # get character vector not a tibble
+guidelines[["food"]]# get character vector not a tibble
 ```
 
 The pull function can be very useful when combined with other functions (for example you typically want to use a vector with the `str_replace()` function), but just like select, we can't start assignments with `pull()`.
@@ -732,9 +745,10 @@ Why do these commands not reassign the food variable values?
 
 ####
 
-The bracket option is great alternative and allows us to reassign the values within guidelines easily
+The bracket option is great alternative and allows us to reassign the values within guidelines easily. Either of the two styles of brackets: `[,c("variable name")]` and `[["variablename"]]` will work.
 
 ```{r}
+#1st method: `[,c("variable name")]`
 #Replacing "sugar-sweetened" with "sugar-sweetened beverages"
 guidelines[,c("food")] <- 
   str_replace( 
@@ -742,8 +756,9 @@ guidelines[,c("food")] <-
   pattern = "sugar-sweetened", 
   replacement = "sugar-sweetened beverages")
 
+#2nd method: `[["variablename"]]`
 #Replacing "seafood omega-3" with"seafood omega-3 fatty acids"
-guidelines[,c("food")] <- 
+guidelines[["food"]] <- 
   str_replace( 
   pull(guidelines,"food"), 
   pattern = "seafood omega-3", 
@@ -751,7 +766,6 @@ guidelines[,c("food")] <-
 
 guidelines
 ```
-
 
 Finally, the best option is probably the `mutate_at()` function from `dplyr`. In this case we need to include `~` in front of the function that we would like to use on the values in our `food` variables. We also include `.` as a replacement to reference the data that we want to use within `str_replace()` (which in this case is the `food` variable values of `guidelines`).
 
@@ -792,21 +806,108 @@ OK! Now we know how much of each dietary factor we generally need for optimal he
 
 ## What did we learn?
 
-1) You will be able to identify when `stringr` might be useful for particular kinds of data.
+1) We know when when `stringr` might be useful for particular kinds of data.
 
-2) You will know how to use some very useful `stringr` functions like:
+Genomic sequence data, text data etc.
+
+2) You know how to use some very useful `stringr` functions like:
 
 Function   | Use                                                                         
 ---------- |-------------
-`str_replace()` | test yourself... 
-`str_split()`  | test yourself...
-`str_subset()` | test yourself...
-`str_count()` | test yourself...
-`str_which()` | test yourself...
-`str_remove()` | test yourself...
-`str_trim()` | test yourself... 
-`str_squish()` | test yourself...
+`str_replace()` | replace or exchange a pattern of characters for another 
+`str_split()`  | split or divide strings of any size (words/sentences/paragraphs/) into substrings
+`str_subset()` | select part of a string based on a characteristic
+`str_count()` | count the occurrence of a specific character
+`str_which()` | identify where an occurrence of a specific character occurs 
+`str_remove()` | remove characters from your strings
+`str_trim()` | remove leading and tailing white space 
+`str_squish()` | remove all white space
 
-3) You will know how to work with regular expressions.
+3) You know how to work with regular expressions. 
 
-4) You will be able to name other packages that are useful for wrangling data that contains characters.
+Don't forget `\\`!
+
+4) You can name other packages that are useful for wrangling data that contains characters.
+
+`pdftools`
+
+`tidyr`
+
+`dplyr`
+
+`purrr`
+
+
+## Helpful Links
+
+For more helpful tutorials of a similar style as this one see [here](https://opencasestudies.github.io/). More will be coming including a longer version of this tutorial!
+
+For more information about the tidyverse see [here](https://www.tidyverse.org/).
+
+For information on other `stringr` functions see [here](https://stringr.tidyverse.org/reference/index.html).
+
+See [here](https://cran.r-project.org/web/packages/stringr/vignettes/regular-expressions.html){target="_blank"} for more info about regular expressions in R. 
+
+Get Cheat Sheats [here](https://rstudio.com/resources/cheatsheets/).
+
+
+<b><u>Here are links for these packages and the others used in this tutorial:</u></b>
+
+ Package   | Use                                                                         
+---------- |-------------
+[here](https://github.com/jennybc/here_here){target="_blank"}       | to easily load and save data
+[dplyr](https://dplyr.tidyverse.org/){target="_blank"}      | to arrange/filter/select/compare specific subsets of the data 
+[pdftools](https://cran.r-project.org/web/packages/pdftools/pdftools.pdf){target="_blank"}   | to read a pdf into R   
+[stringr](https://stringr.tidyverse.org/articles/stringr.html){target="_blank"}    | to manipulate the text within the pdf of the data
+[magrittr](https://magrittr.tidyverse.org/articles/magrittr.html){target="_blank"}   | to use the `%<>%` pipping operator
+[purrr](https://purrr.tidyverse.org/){target="_blank"}      | to perform functions on all columns of a tibble
+[tibble](https://tibble.tidyverse.org/){target="_blank"}     | to create data objects that we can manipulate with dplyr/stringr/tidyr/purrr
+[tidyr](https://tidyr.tidyverse.org/){target="_blank"}      | to separate data within a column into multiple columns
+
+
+<b><u>Here is a summary of helpful links about many of the functions used in this tutorial:</u></b>
+
+(Thanks to [Leonardo Collado-Torres](http://lcolladotor.github.io/) for gathering these!)
+
+magrittr::[`%>%`](https://magrittr.tidyverse.org/reference/pipe.html) and [`%<>%`](https://magrittr.tidyverse.org/reference/compound.html)
+
+here::[here()](https://here.r-lib.org/reference/here.html)
+
+dplyr::[nth() last() and first()](https://dplyr.tidyverse.org/reference/nth.html)
+
+pdftools::[pdf_text()](https://docs.ropensci.org/pdftools/reference/pdftools.html)
+
+tidyr::[glimpse()](https://tibble.tidyverse.org/reference/glimpse.html)
+
+stringr::[str_split() and str_split_fixed()](https://stringr.tidyverse.org/reference/str_split.html)
+
+stringr::[str_replace_all()](https://stringr.tidyverse.org/reference/str_replace.html)
+
+purrr::[map()](https://purrr.tidyverse.org/reference/map.html)
+
+tibble::[tibble()](https://tibble.tidyverse.org/reference/tibble.html + as_tibble())
+
+tidyr::[separate()](https://tidyr.tidyverse.org/reference/separate.html)
+
+purrr::[modify_at()](https://purrr.tidyverse.org/reference/modify.html)
+
+readr::[read_file()](https://readr.tidyverse.org/reference/read_file.html)
+
+stringr::[str_count()](https://stringr.tidyverse.org/reference/str_count.html)
+
+dplyr::[pull()](https://dplyr.tidyverse.org/reference/pull.html)
+
+dplyr::[na_if()](https://dplyr.tidyverse.org/reference/na_if.html)
+
+dplyr::[mutate()](https://dplyr.tidyverse.org/reference/mutate.html)
+
+dplyr::[filter()](https://dplyr.tidyverse.org/reference/filter.html) (not stats::filter() !!)
+
+dplyr::[vars()](https://dplyr.tidyverse.org/reference/vars.html)
+
+
+
+
+
+<div align="center"> *Thanks for reading!* `r emo::ji("smile")` `r emo::ji("heart")`</div>
+
