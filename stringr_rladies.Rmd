@@ -1,0 +1,812 @@
+---
+title: "[R-Ladies Baltimore](https://rladies-baltimore.github.io/): Wrangling a pdf with [`stringr`](https://stringr.tidyverse.org/) "
+subtitle: Carrie Wright https://carriewright11.github.io/
+css: style.css
+output:
+  html_document:
+    self_contained: yes
+    code_download: yes
+    highlight: tango
+    number_sections: no
+    theme: cosmo
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    includes:
+      in_header: header.tex
+    toc: yes
+  word_document:
+    toc: yes
+
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(include = TRUE, comment = NA, echo = TRUE,
+                      message = FALSE, warning = FALSE, cache = FALSE,
+                      fig.align = "center", out.width = '90%')
+library(here)
+library(knitr)
+library(emo)
+```
+
+<style>
+#TOC {
+  background: url("https://pbs.twimg.com/profile_images/1236855715018559488/PuYAjTTD_400x400.jpg");
+  background-size: contain;
+  padding-top: 240px !important;
+  background-repeat: no-repeat;
+}
+</style>
+
+
+```{r, echo = FALSE}
+knitr::include_graphics(here::here("img/Baltimore.png"))
+```
+
+## Motivation
+`stringr` is a super useful package for dealing with character strings. We will demonstrate how to wrangle and manipulate character strings by importing a pdf. 
+```{r, out.width = "20%", echo = FALSE, fig.align ="center"}
+include_graphics("https://stringr.tidyverse.org/logo.png")
+```
+
+If this tutorial convinces you that `stringr` is awesome `r emo::ji("haha")`... you can apparently buy wall art of the hex sticker and decorate your home or office, at [www.redbubble.com](https://www.redbubble.com/people/rstudio-inc/): 
+
+
+```{r, out.width = "80%", echo = FALSE, fig.align ="center"}
+include_graphics("https://ih1.redbubble.net/image.543362114.2165/cmp,x_small,gloss,product,750x1000.u1.jpg")
+```
+
+We are going to show an example of wrangling character strings from the pdf file for this article.
+
+```{r, echo = FALSE}
+knitr::include_graphics(here::here("img", "thepaper.png"))
+```
+
+
+This article evaluated food consumption patterns in 195 countries for 15 different dietary risk factors that have probable associations with non-communicable disease (NCD).  If you are interested in more about this, stay tuned for our [case study](https://opencasestudies.github.io/){target="_blank"}.
+
+This example will involve using many of the functions of the `stringr` package. This package is part of the  [Tidyverse](https://www.tidyverse.org/){target="_blank"}. The Tidyverse is a library of packages created by RStudio. These packages make data science in R especially efficient.
+
+```{r, out.width = "20%", echo = FALSE, fig.align ="center"}
+include_graphics("https://tidyverse.tidyverse.org/logo.png")
+```
+
+### Learning Objectives
+
+1) You will be able to identify when `stringr` might be useful for particular kinds of data.
+
+2) You will know how to use some very useful `stringr` functions like:
+
+Function   | Use                                                                         
+---------- |-------------
+`str_replace()` | replace or exchange a pattern of characters for another 
+`str_split()`  | split or divide strings of any size (words/sentences/paragraphs/) into substrings
+`str_subset()` | select part of a string based on a characteristic
+`str_count()` | count the occurrence of a specific character
+`str_which()` | identify where an occurrence of a specific character occurs 
+`str_remove()` | remove characters from your strings
+`str_trim()` | remove leading and tailing white space 
+`str_squish()` | remove all white space
+
+For information on other functions see [here](https://stringr.tidyverse.org/reference/index.html).
+
+3) You will know how to work with regular expressions.
+
+4) You will be able to name other packages that are useful for wrangling data that contains characters.
+
+
+We will begin by loading the packages that we will need:
+
+```{r}
+library(here)
+library(readr)
+library(dplyr)
+library(pdftools)
+library(stringr)
+library(magrittr)
+library(purrr)
+library(tibble)
+library(tidyr)
+```
+
+
+## What are the data?
+
+An [article](https://www.thelancet.com/action/showPdf?pii=S0140-6736%2819%2930041-8){target="_blank"} was recently published in the lancet journal that evaluates global dietary trends and the relationship of these dietary factors with mortality and fertility.
+
+This article includes a table that contains dietary guidelines for dietary factors that are particularly associated with health risk.
+
+## Data Import
+
+We are interested in this table on page 3 of the article:
+
+```{r, echo = FALSE, out.width = "700px"}
+knitr::include_graphics(here::here("img", "Table.png"))
+```
+
+
+First let's import the PDF using the `pdftools` package.
+```{r}
+paper<-pdftools::pdf_text(here("docs", "Afshin et al. 2019 - Health effects of dietary risks in 195 countries,  ... 17 - a systematic analysis for the Global Burden of Disease Study 2017.pdf"))
+```
+
+We can use the `base` `summary()` function to get a sense of what the data looks like. By `base` we mean that these functions are part of the `base` package and are loaded automatically.Thus `library(base)` is not required.
+
+```{r}
+summary(paper)
+#This is equivalent to the following, but this is unecessary:
+#base::summary(paper)
+```
+
+We can see that we have 15 different character strings. Each one contains the text on each of the 15 different pages of the PDF.
+
+We can get similar results using the `glimpse()` function of the `dplyr` package (it is also in the `tibble` package).
+
+```{r}
+glimpse(paper)
+```
+
+We will be using the `%>%` pipe for sequential steps in our code later on.
+This will make more sense when we have multiple sequential steps using the same data object.
+
+We could do the same code as above using this notation. For example we first grab the paper object, then we glimpse it.
+
+```{r}
+paper %>%
+  glimpse()
+```
+
+
+## Data Wrangling
+
+Again, the table we are interested in is on the third page, so let's grab just that portion of the PDF.
+
+Here is what the top of this page looks like before the table:
+
+```{r, echo = FALSE, out.width = "700px"}
+knitr::include_graphics(here::here("img", "page3.png"))
+```
+
+```{r}
+#Here we will select the 3rd value in the paper object
+table <- paper[3]
+
+summary(table)
+
+```
+
+Here we can see that the `table` object now contains the text from the 3rd page as a *single large character string*.
+
+```{r}
+glimpse(table, nchar.max = 800)
+
+```
+
+The text is difficult to read because of the column structure in the pdf. Now let's try to grab just the text in the table.
+
+One way to approach this is to split the string by some pattern that we notice in the table.
+
+```{r, echo = FALSE, out.width = "700px"}
+knitr::include_graphics(here::here("img", "Table.png"))
+```
+
+Only the capitalized form of the word "Diet" appears to be within the table, and is not present in the preceding text (although "diet" is). All the rows of interest of the table appear to start with the word "Diet".
+
+```{r, echo = FALSE, out.width = "700px"}
+knitr::include_graphics(here::here("img", "Diet_on_page3.png"))
+```
+
+
+Let's use the `str_split()` function of the `stringr` package to split the data within the object called `table`by the word "Diet".  Only lines from page 3 that contain the word `Diet` will be selected (and not "diet" as this function is case-sensitive). Each section of the text that contains "Diet" will be split into individual pieces every time the world "Diet" occurs and the word itself will be removed.
+
+In this case we are also using the magrittr assignment pipe or double pipe that looks like this `%<>%`. This allows us use the table data as input to the later steps but also reassign the output to the same data object name.
+
+```{r}
+tableraw<-table
+table %<>%
+  stringr::str_split(pattern = 'Diet')
+```
+
+Using  the `base::summary()` and `dplyr::glimpse()` function we can see that we created a list of the 17 rows in the table that contain the word "Diet". 
+
+```{r}
+table %>%
+ summary()
+```
+
+We can see that we start with the row that contains "Diet low in fruits". 
+
+```{r}
+table %>%
+  glimpse() # note we created a list of 17 character strings
+```
+
+RStudio creates really helpful cheat sheets like this one which shows you all the major functions in `stringr`. You can download others [here](https://rstudio.com/resources/cheatsheets/){target="_blank"}.
+
+```{r, echo = FALSE, out.width = "700px"}
+knitr::include_graphics(here::here("img", "strings-1_str_split.png"))
+```
+
+You can see that we could have also used the `str_split_fixed()` function which would also separate the substrings into different columns of a matrix.
+
+Note: we would need to know the number of substrings or pieces that we would like returned.
+
+For example...
+
+If we used the fixed version, we will create 3 vectors of a matrix with the first 3 strings that would be created when dividing the large string based on the first 3 occurrences of "Diet".
+```{r}
+tableraw %>%
+  stringr::str_split_fixed(pattern = 'Diet', n = 3) %>% 
+  class()
+```
+
+We can also specify the number of splits with the `str_split()`, but this will create a list of substrings, not a matrix.
+
+```{r}
+tableraw %>%
+  stringr::str_split(pattern = 'Diet', n = 3) %>% 
+  class()
+```
+
+
+For more information about `str_split()` see [here](http://rfunction.com/archives/1499){target="_blank"}
+and [here](https://stringr.tidyverse.org/reference/str_split.html){target="_blank"}.
+
+Now, back to our single list of 17 character strings.
+
+Let's separate the values within the list using the base `unlist` function, this will allow us to easily select the different substrings within the object called `table`.
+
+```{r}
+table %<>%
+  unlist() 
+
+summary(table)
+```
+
+It's important to realize that the first split will include the text before the first occurrence of `Diet` as the first value in the output. We could use the `first()` function of the `dplyr` package to look at this value. However, we will suppress the output as this is quite large.
+
+```{r, eval = FALSE}
+dplyr::first(table)
+```
+
+Instead we can take a look at the second element of the list. using the `nth()` function of `dplyr`.
+
+```{r}
+nth(table, 2)
+```
+
+Indeed this looks like the first row of interest in our table:
+
+```{r,echo = FALSE,out.width= "700px"}
+knitr::include_graphics(here("img", "firstrow.png"))
+```
+
+
+Using the `last()` and the `nth()` functions of the `dplyr` package we can take a look at the last values of the list.
+```{r}
+#to see the second to last value we can use nth()
+#the -2 specifies that we want the second to last value
+#-3 would be third to last and -1 would be the last value
+dplyr::nth(table, -2)
+
+#to see the very last value we can use last()
+dplyr::last(table)
+
+```
+
+```{r, echo = FALSE, out.width = "700px"}
+knitr::include_graphics(here::here("img", "end_of_table.png"))
+```
+
+
+Therefore, we don't need this part of the table or the text before the table if we just want the consumption recommendations. 
+
+So we will select the 2nd through the second to last of the substrings. Since we have 17 substrings, we will select the 2nd through the 16th. However a better way to do this rather than selecting by index, would be to select phrases that are unique to the text within the table that we want. We will use the `str_subset()` function of `stringr` package to select the table rows with consumption guidelines.  Most of the rows have the phrase "Mean daily consumption", however, there are other phrases for some of the rows, including "Mean daily intake" and "24 h sodium." So we will subset for each of these phrases.
+
+```{r}
+# one could subset the table like this:
+#table <- table[2:16]
+
+table %<>%
+str_subset(
+  pattern = "Mean daily consumption|Mean daily intake|24 h")
+```
+
+Notice that we separate the different patterns to look for using vertical bar character "|" and that all of the patterns are within quotation marks together.
+
+#### {.question_block}
+<u>Question opportunity:</u> 
+
+1) What other string patterns could you use to subset the rows of the table that we want?
+
+2) Why might it be better to subset based on the text rather than the index?
+
+####
+
+
+Now the first row is what we want:
+```{r}
+first(table)
+```
+
+And the last row is what we want:
+```{r}
+last(table)
+```
+
+Notice that there the decimal points from the pdf are being recognized as an interpunct instead of a period or decimal. An interpunct is a centered dot, as opposed to a period or decimal that is aligned to the bottom of the line.
+
+The interpunct was previously used to separate words in certain languages, like ancient Latin.
+
+
+<p align="center">
+  <img width="400" src="https://www.yourdictionary.com/image/articles/3417.Latin.jpg">
+</p>
+
+###### [[source](https://www.yourdictionary.com/image/articles/3417.Latin.jpg)]
+
+You can produce an interpunct on a mac like this:
+
+
+<p align="center">
+  <img width="400" src="https://www.shorttutorials.com/mac-os-special-characters-shortcuts/images/middle-dot.png">
+</p>
+
+###### [[source](https://www.shorttutorials.com/mac-os-special-characters-shortcuts/middle-dot.html)]
+
+
+It is important to replace these for later when we want these values to be converted from character strings to numeric. We will again use the `stringr` package. This time we will use the `str_replace_all()` function which replaces all instances of a pattern in an individual string. In this case we want to replace all instances of the interpunct with a decimal point.
+
+
+```{r,}
+table %<>%
+  stringr::str_replace_all( pattern = "·", 
+                            replacement = ".")
+```
+
+
+Now we will try to split the strings for each row based on the presence of 2 spaces to create the columns of the table, as there appears to be larger than a space between the columns to create substrings. The substrings will be separated by quotes.
+
+```{r, echo = FALSE,out.width = "700px"}
+knitr::include_graphics(here("img", "strings-2_highlight.png"))
+```
+
+
+The second page of the `stringr` cheat sheet has more information about using "Special Characters" in `stringr`. For example `\\s` is interpreted as a space as the `\\` indicates that the `s` should be interpreted as a special character and not simply the letter s.  The {2,} indicates 2 or more spaces, while {2} would indicate exactly 2 spaces.
+
+So here we will separate the substrings into columns by 2 more more spaces:
+
+#### {.scrollable }
+```{r}
+table_split <- str_split(string=table, 
+                         pattern= "\\s{2,}")
+glimpse(table_split) #scroll the output!
+```
+####
+
+If we look closely, we can see that the sugar-sweetened beverage and the seafood category had only one space between the first and second columns - the columns about the dietary category and the one that describes in more detail what the consumption suggestion is about.
+
+The values for these two columns appear to be together still in the same substring for these two categories. There are no quotation marks adjacent to the word `"Mean"`.
+
+Here you can see how the next substring should have started with the word `"Mean"` by the new inclusion of a quotation mark `"`. 
+
+```{r, echo = FALSE, out.width = "700px"}
+knitr::include_graphics(here("img", "substring_sep.png"))
+```
+
+We can add an extra space in front of the word `"Mean"` for these particular categories and then try splitting again.
+
+Since we originally split based on 2 or more spaces, we can just add a space in front of the word "Mean" for all the table strings and then try subsetting again. We can use the `str_which()` function of the `stringr` package to find the index of these particular cases.
+
+```{r}
+table%>%
+str_which(pattern = "seafood|sugar")
+```
+
+Now we can replace these values within the table object:
+```{r}
+table[9] <-stringr::str_replace(pattern = "Mean", 
+                                replacement = " Mean", table[9])
+table[12] <-stringr::str_replace(pattern ="Mean", 
+                                 replacement =" Mean", table[12])
+table_split <- str_split(table,pattern= "\\s{2,}")
+```
+
+We could also just add a space in front of all the values of "Mean" in the table since the split was performed based on 2 or more spaces. Thus the other elements in `table` would also be split just as before despite the additional space.
+
+```{r, eval = FALSE}
+table<-table %>%
+  stringr::str_replace(pattern ="Mean", 
+                       replacement = " Mean")
+table_split <- str_split(table,pattern= "\\s{2,}")
+```
+
+#### {.scrollable }
+```{r}
+#scroll the output!
+glimpse(table_split) 
+```
+####
+
+Looks better!
+
+We want just the first (the food **category**) and third column (the optimal consumption **amount** suggested) for each row in the table.
+
+We can use the `map` function of the `purrr` package to accomplish this.
+
+The `map` function allows us to perform the same action multiple times across each element within an object.
+
+This following will allow us to select the 1st or 3rd substring from each element of the `table` object.
+
+```{r}
+category <-map(table_split,1)
+amount <-map(table_split,3)
+head(category)
+head(amount)
+```
+
+Now we will create a `tibble` using this data. However, currently both `category` and `amount` are of class `list`. To create a `tibble` we need to unlist the data to create vectors.
+
+```{r}
+class(category)
+category %<>%unlist()
+amount %<>%unlist()
+class(category)
+```
+
+#### {.scrollable }
+```{r}
+category
+amount
+```
+####
+
+We could have done all of this at once in one command like this:
+
+```{r, eval = FALSE}
+category <-unlist(map(table_split,1))
+amount <-unlist(map(table_split,3))
+```
+
+Now we will create a `tibble`, which is an important data frame structure in the tidyverse which allows us to use other packages in the tidyverse with our data.
+
+We will name our `tibble` columns now as we create our `tibble` using the `tibble()` function of both the `tidyr` and the `tibble` packages, as names are required in tibbles.
+
+```{r}
+guidelines <-tibble::tibble(category = category,
+                              amount = amount)
+guidelines
+```
+
+Looking pretty good!
+
+However, we want to separate the different amounts within the amount column.
+
+Recall what the original table looked like:
+```{r, echo = FALSE, out.width = "700px"}
+knitr::include_graphics(here("img", "firstrow.png"))
+```
+
+### Separating values within a variable
+
+We can use the `tidyr::separate()` function to separate the data within the amount column into three new columns based on the optimal level and the optimal range. We can separate the values based on the open parentheses `"("` and the long dash `"–"` characters.
+
+```{r}
+# The first column will be called optimal
+# It will contain the 1st part of the amount column data before the 1st underscore"("
+# The 2nd column will be called lower
+# It will contain the data after the "("
+# The 3rd column will be called upper 
+# It will contain the 2nd part of the data based on the "–"
+
+guidelines%<>% 
+  tidyr::separate(amount, 
+                  c("optimal", "lower", "upper"),
+                  sep ="[[(|–]]") 
+head(guidelines)
+```
+
+
+Let's Also create a new variable/column in our tibble that indicates the direction that can be harmful for each dietary factor.
+
+```{r}
+guidelines%<>%
+  separate(category, c("direction", "food"), sep = " in ")
+guidelines
+```
+
+If we wanted to remove the direction variable we could use the purrr::modify_at() function:
+```{r,eval = FALSE}
+guidelines %>% purrr::modify_at("direction",~NULL)
+```
+
+
+### Data cleaning with regular expressions
+
+OK, looking better, but we still need a bit of cleaning to remove symbols and extra words from the columns. Some of the extra symbols include: `"%"`, `")"` and the `"*"`.
+
+The `"*"` and the `")"` are what we call metacharacters or [regular expressions](https://www.r-bloggers.com/regular-expressions-every-r-programmer-should-know/){target="_blank"}. These are characters that have special meanings.
+
+```{r, echo = FALSE, out.width = "700px"}
+knitr::include_graphics(here("img", "RegExCheatsheet.png"))
+```
+
+Now we need the `"\\"` to indicate that we want these characters to be matched exactly and not interpreted as the meaning of the symbol.
+
+See [here](https://cran.r-project.org/web/packages/stringr/vignettes/regular-expressions.html){target="_blank"} for more info about regular expressions in R. 
+
+Also here we have a bit of an example using the `str_count()` function of `stringr`, which counts the number of instances of a character string. In this case we will look for individual characters but you could also search for words or phrases.
+
+Count the letter t:
+```{r}
+regextest<-readr::read_file(here("docs", "regEx.txt"))
+regextest
+str_count(regextest,"t")#notice this doesn't include the t in the tab
+```
+
+Count tabs:
+```{r}
+str_count(regextest,"\\t")#search for tab
+```
+
+Count parentheses:
+```{r}
+# this would not work because r thinks this is part of the code itself
+#str_count(regextest, ")") 
+# this would not work because r thinks this is part of the code itself
+#str_count(regextest, "\)")
+str_count(regextest, "\\)") #this works!
+```
+
+Count the occurrence of the astrix:
+```{r}
+# this also does not work
+#str_count(regextest, "*")
+# nor does this
+#str_count(regextest, "\*")
+str_count(regextest, "\\*")#this works!
+```
+
+We also want to make a unit variable so that we can make sure that our units are consistent later. 
+
+```{r}
+guidelines %>%
+pull(optimal) 
+```
+
+Notice that the values that are percentages don't have spaces between the number and the unit.
+We can separate the `optimal` values by a space or a percent symbol `"%"` using `"|"` to indicate that we want to separate by either. In this case we will lose the "%" and will need to add it back to those values.
+
+We can specify a space using an actual space or `\\s`.
+
+```{r}
+guidelines%>%
+  separate(optimal, into =c("optimal", "unit"), sep = " |%", remove = FALSE)
+
+guidelines%<>%
+  separate(optimal, into =c("optimal", "unit"), sep = "\\s|%", remove = FALSE)
+
+```
+
+Great, so to now we will add "`%`" to the `unit` variable for  the `low in polyunsaturated` and `high in trans fatty acids` rows.
+
+First we need to replace the empty values with NA using the `na_if()` function of the `dplyr` package.
+
+```{r}
+guidelines %<>%
+na_if("")
+guidelines
+```
+
+
+Then to replace the `NA` values, we can use the `replace_na()` function in the `tidyr` package and the `mutate()` function of `dplyr` to specify which values to replace, in this case the `NA` values within the variable `unit`. Essentially this variable gets reassigned with the new values, as we mostly think of the `mutate()` function as creating new variables.
+
+```{r}
+guidelines %<>% 
+  dplyr::mutate(unit = replace_na(unit, "%"))
+
+#now just to show these rows
+guidelines %>%
+  filter(unit == "%")
+
+```
+
+Let's also move `unit` to be the last column. We can use the `select()` and `everything()` functions of the `dplyr` package to do this.
+
+```{r}
+guidelines %<>%
+  select(-unit,everything())
+```
+
+Here you can see Hadley Wickham's (Chief Scientist at RStudio) explanation for this behavior of `select()`:
+
+```{r, echo= FALSE}
+knitr::include_graphics(here("img", "select.png"))
+```
+https://github.com/tidyverse/dplyr/issues/2838#issuecomment-306062800
+
+To remove all of the remaining extra characters and words we will again use the `stringr` package. This time we will use the `str_remove()` function to remove all instances of these characters.
+
+```{r}
+guidelines <-as_tibble(
+  map(
+    guidelines,
+    str_remove,
+    pattern = "\\) per day|\\) of total daily energy"))
+
+guidelines <-as_tibble(
+  map(guidelines, 
+      str_remove,
+      pattern = "\\*"))
+
+guidelines
+```
+
+Nice! that's pretty clean but we can do a bit more.
+
+### Data type conversion
+
+One of the next things to notice about our data is the character classes of our variables.
+
+Notice that the optimal amounts of consumption are currently of  class character as indicated by the `<chr>` just below the column names / variable names of the `guidelines` tibble:
+
+```{r}
+guidelines
+```
+
+
+To convert these values to numeric we can use the `mutate_at()` function of the `dplyr` package.
+
+The `mutate_at()` function allows us to perform a function on specific columns/variables within a tibble. We need to indicate which variables that we would like to convert using `vars()`. In this case if we look at the beginning of the `guidelines` tibble, we can see that `optimal`, `lower` and `upper` should be converted. As these three columns are sequential, we can simply put a `:` between `optimal` and `upper` to indicate that we want all the variables in between these columns to be converted. 
+
+```{r}
+guidelines%<>%
+  mutate_at(vars(lower:upper), as.numeric)
+guidelines
+```
+
+Great! Now these variables are of class `<dbl>` (stands for double) which indicates that they are numeric. Here is a [link](http://uc-r.github.io/integer_double/){target="_blank"} for more info on numeric classes in R.
+
+If we had not replaced the `"·"` interpunct values to a period conversion from character to numeric will be problematic and will result in NA values.
+
+### Data value reassignments
+
+We seem to have lost the word `"beverages"` from the `"sugar-sweetened beverages"` category,  as well as `"fatty acids"` from the `"seafood omega 3 fatty acids"`, and the `"polyunsaturated fatty acids"` categories as the full category name was listed on two lines within the table. We would like to replace these values with the full name. 
+
+To select the `food` column we will show you several options. Only a couple will work well with reassigning the data in that particular variable within `guidelines` without assigning an intermediate data object. We will look using `mutate_at()`, `pull()`, `select()`, and brackets `[,c("variable name")]`.
+
+The bracket option and the select() option will grab a tibble (data frame) version of the food column out of guidelines. However we can't start commands with select for assignments.
+
+```{r}
+guidelines[,c("food")] #same output as select
+select(guidelines, "food") # same output as brackets
+```
+
+
+`pull()` in contrast, will grab the vector version of the food data:
+
+```{r}
+pull(guidelines, "food") # get character vector not a tibble
+```
+
+The pull function can be very useful when combined with other functions (for example you typically want to use a vector with the `str_replace()` function), but just like select, we can't start assignments with `pull()`.
+
+
+This is not possible and will result in an error:
+```{r, eval = FALSE}
+select(guidelines, food) <- 
+   str_replace( 
+   pull(guidelines,"food"), 
+   pattern = "sugar-sweetened", 
+   replacement = "sugar-sweetened beverages")
+```
+
+This will only print the result, but not reassign the food variable values:
+
+```{r}
+guidelines %>%
+   pull(food)%>%
+   str_replace( 
+   pattern = "sugar-sweetened", 
+   replacement = "sugar-sweetened beverages")
+```   
+
+Using `select()` would work as well to print the result (although the result structure is different):
+
+```{r}
+guidelines %>%
+   select(food)%>%
+   str_replace( 
+   pattern = "sugar-sweetened", 
+   replacement = "sugar-sweetened beverages")
+
+```
+
+#### {.question_block}
+
+<u>Question opportunity:</u> 
+
+Why do these commands not reassign the food variable values?
+
+####
+
+The bracket option is great alternative and allows us to reassign the values within guidelines easily
+
+```{r}
+#Replacing "sugar-sweetened" with "sugar-sweetened beverages"
+guidelines[,c("food")] <- 
+  str_replace( 
+  pull(guidelines,"food"), 
+  pattern = "sugar-sweetened", 
+  replacement = "sugar-sweetened beverages")
+
+#Replacing "seafood omega-3" with"seafood omega-3 fatty acids"
+guidelines[,c("food")] <- 
+  str_replace( 
+  pull(guidelines,"food"), 
+  pattern = "seafood omega-3", 
+  replacement = "seafood omega-3 fatty acids")
+
+guidelines
+```
+
+
+Finally, the best option is probably the `mutate_at()` function from `dplyr`. In this case we need to include `~` in front of the function that we would like to use on the values in our `food` variables. We also include `.` as a replacement to reference the data that we want to use within `str_replace()` (which in this case is the `food` variable values of `guidelines`).
+
+Notice we didn't need this when we previously use `mutate_at()` with the `as.numeric()` function. This is because the `str_replace()` function requires us to specify what data we are using as one of the arguments, while `as.numeric()` does not.
+
+```{r}
+
+#Replacing "polyunsaturated" with"polyunsaturated fatty acids"
+guidelines%<>%
+  mutate_at(vars(food),
+  ~str_replace( 
+  string = ., 
+  pattern = "polyunsaturated", 
+  replacement = "polyunsaturated fatty acids"))
+
+guidelines
+
+```
+
+This might be considered a better option because it is more readable as to where the `food` data came from that we are replacing values within.
+
+There is one last minor detail... the `direction` variable has leading spaces still. We can use `str_trim()` to fix that! (You could also use `str_squish()` which removes all white spaces, not just leading spaces)
+
+```{r}
+guidelines%>%
+  mutate_at(vars(direction), str_trim)
+
+#gives identical results in this case
+guidelines%<>%
+  mutate_at(vars(direction), str_squish)
+guidelines
+```
+
+OK! Now we know how much of each dietary factor we generally need for optimal health according to the guidelines used in this article.
+
+ 
+
+
+## What did we learn?
+
+1) You will be able to identify when `stringr` might be useful for particular kinds of data.
+
+2) You will know how to use some very useful `stringr` functions like:
+
+Function   | Use                                                                         
+---------- |-------------
+`str_replace()` | test yourself... 
+`str_split()`  | test yourself...
+`str_subset()` | test yourself...
+`str_count()` | test yourself...
+`str_which()` | test yourself...
+`str_remove()` | test yourself...
+`str_trim()` | test yourself... 
+`str_squish()` | test yourself...
+
+3) You will know how to work with regular expressions.
+
+4) You will be able to name other packages that are useful for wrangling data that contains characters.
